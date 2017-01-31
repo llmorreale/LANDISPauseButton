@@ -1,0 +1,15 @@
+# Visual Studio - solution user options
+*.suo
+src/*.sln
+src/*.suo
+src/*.user
+
+# Staging directory for library packages
+packages/
+
+# Build directories
+src/bin/
+src/obj/
+
+# Compiled installers
+deploy/*.exe

@@ -1,0 +1,38 @@
+LandisData  "Biomass Harvest"
+
+
+Timestep    1
+
+ManagementAreas "./mgmt-x.gis"
+
+Stands      "./wobegon_stands_1ha.img"
+
+>> -----------------------------------------
+>> PRESCRIPTIONS
+
+>>"Improvement Silviculture"
+Prescription ImprvSlv1
+    StandRanking 	Random
+    ForestTypeTable
+    SiteSelection 	CompleteStandSpread   2 20
+    CohortsRemoved PlantOnly
+Plant PIRU	
+
+
+
+>>-----------------------------------------------------------------
+>> PRESCRIPTION IMPLEMENTATION 
+
+    HarvestImplementations
+>>  Mgmt Area   Prescription    Harvest Area    Begin Time  End Time
+>>  ---------   ------------    ------------    ----------  --------
+	1	ImprvSlv1	50%	1 3
+
+
+>>-----------------------------------------------------------------
+>> OUTPUTS
+
+PrescriptionMaps    harvest/harvprescripts-{timestep}.img
+BiomassMaps harvest/harvbiomass-removed-{timestep}.img
+EventLog            harvest/log.csv
+SummaryLog harvest/summary-log.csv

@@ -10,3 +10,10 @@ src/obj/
 
 # Compiled installers
 deploy/*.exe
+
+#Misc
+insect_example/
+wobegon_PnET/output/
+wobegon_PnET/Insects/
+wobegon_PnET/Metadata/
+wobegon_PnET/landusefile/

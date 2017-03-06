@@ -2,12 +2,21 @@
 // For copyright and licensing information, see the NOTICE and LICENSE
 // files in this project's top-level directory, and at:
 //   https://github.com/LANDIS-II-Foundation/Extension-Land-Use-Change
+//
+//  Pause Extension for Thomspon lab
+//   https://github.com/llmorreale/LANDISPauseButton
+//
 
 using Landis.Core;
 using Landis.Library.Succession;
 using Landis.SpatialModeling;
 using log4net;
+
+using System;
+using System.ComponentModel;
 using System.Collections.Generic;
+using System.IO;
+using System.Diagnostics;
 
 namespace Landis.Extension.LandUse
 {
@@ -46,7 +55,17 @@ namespace Landis.Extension.LandUse
 
         public override void Initialize()
         {
+            Model.Core.UI.WriteLine("***********************************************************");
+            Model.Core.UI.WriteLine("***********************************************************");
+            Model.Core.UI.WriteLine("This is the Thompson lab's custom Land-Use module");
+            Model.Core.UI.WriteLine("-----------------------------------------------------------");
+            Model.Core.UI.WriteLine("Modification of form is admitted to be a matter of time.");
+            Model.Core.UI.WriteLine("\t-Alfred Russel Wallace");
+            Model.Core.UI.WriteLine("***********************************************************");
+            Model.Core.UI.WriteLine("***********************************************************");
+            
             Model.Core.UI.WriteLine("Initializing {0}...", Name);
+
             SiteVars.Initialize(Model.Core);
             Timestep = parameters.Timestep;
             inputMapTemplate = parameters.InputMaps;
@@ -70,7 +89,8 @@ namespace Landis.Extension.LandUse
             if (SiteLog.Enabled)
                 SiteLog.TimestepSetUp();
 
-            ProcessInputMap(
+            //ProcessInputMap(
+            ProcessInputMapAsync(
                 delegate(Site site,
                          LandUse newLandUse)
                 {
@@ -115,8 +135,140 @@ namespace Landis.Extension.LandUse
         {
             string inputMapPath = MapNames.ReplaceTemplateVars(inputMapTemplate, Model.Core.CurrentTime);
             Model.Core.UI.WriteLine("  Reading map \"{0}\"...", inputMapPath);
+
             IInputRaster<MapPixel> inputMap;
             Dictionary<string, int> counts = new Dictionary<string, int>();
+
+            using (inputMap = Model.Core.OpenRaster<MapPixel>(inputMapPath))
+            {
+                MapPixel pixel = inputMap.BufferPixel;
+                foreach (Site site in Model.Core.Landscape.AllSites)
+                {
+                    inputMap.ReadBufferPixel();
+                    if (site.IsActive)
+                    {
+                        LandUse landUse = LandUseRegistry.LookUp(pixel.LandUseCode.Value);
+                        if (landUse == null)
+                        {
+                            string message = string.Format("Error: Unknown map code ({0}) at pixel {1}",
+                                                           pixel.LandUseCode.Value,
+                                                           site.Location);
+                            throw new System.ApplicationException(message);
+                        }
+                        string key = processLandUseAt(site, landUse);
+                        if (key != null)
+                        {
+                            int count;
+                            if (counts.TryGetValue(key, out count))
+                                count = count + 1;
+                            else
+                                count = 1;
+                            counts[key] = count;
+                        }
+                    }
+                }
+            }
+            foreach (string key in counts.Keys)
+                Model.Core.UI.WriteLine("    {0} ({1:#,##0})", key, counts[key]);
+        }
+
+        //------------------------------------------------------------------------
+
+        /*The Python module can write to the location this method refers to,
+            which appears to be indexed by the model's current time step, or 
+             we can provide a consistent path to the Python module's output */
+        public void ProcessInputMapAsync(ProcessLandUseAt processLandUseAt)
+        {          
+            string inputMapPath = MapNames.ReplaceTemplateVars(inputMapTemplate, Model.Core.CurrentTime);
+            
+            Model.Core.UI.WriteLine("Current time: ", Model.Core.CurrentTime);
+            Model.Core.UI.WriteLine("  Reading map \"{0}\"...", inputMapPath);
+            
+            //Create an empty lockfile at the appropriate path - may need a separate path for lockfile and rasterfile
+            StreamWriter lock_file = new StreamWriter(System.IO.Directory.GetCurrentDirectory() + "/lockfile");
+            lock_file.WriteLine(Model.Core.CurrentTime.ToString());
+            lock_file.Close();
+
+            /*FileStream lockfile = new FileStream(System.IO.Directory.GetCurrentDirectory() + "/lockfile", FileMode.Create);
+            lockfile.WriteByte(Convert.ToByte(Model.Core.CurrentTime));
+            lockfile.Close();*/
+
+            //Call Python module here to signal creation of raster file
+            Process python_process = CallPythonModule();
+
+            //May be able to use this instead of lockfile if python terminates upon detecting raster on file system.
+            python_process.WaitForExit();
+            Model.Core.UI.WriteLine(python_process.StandardOutput.ReadToEnd());
+            python_process.Close(); //Not sure if terminates process of makes results inaccessible
+            ProcessMapAsync(processLandUseAt, inputMapPath);
+
+            //----------------------------------------------------
+
+            //One simple approach would be to loop until the file is deleted
+            /*Model.Core.UI.WriteLine("   Waiting for external output...");
+            int refreshRate = 100;
+            int refreshLimit = 10000;   //Let spin for ten seconds
+            int refreshCount = 0;
+            while (File.Exists(inputMapPath + "/lockfile") || refreshCount > refreshLimit)
+            {
+                System.Threading.Thread.Sleep(refreshRate);
+                Model.Core.UI.WriteLine("Spinning");
+                refreshCount += refreshRate;
+            }
+
+            if (refreshCount > refreshLimit)
+            { Model.Core.UI.WriteLine("Failed to find input"); }
+            else
+            { ProcessMapAsync(processLandUseAt, inputMapPath); }*/
+
+            //Otherwise we can register events to this file system watcher to execute when something changes
+            //FileSystemWatcher file_watcher = new FileSystemWatcher(inputMapPath);
+            //file_watcher.EnableRaisingEvents = true;
+            //System.EventArgs args = new System.EventArgs(ProcessLandUseAt processAt, string inputMapPath);
+            //file_watcher.Deleted += new System.IO.FileSystemEventHandler(ProcessMapAsync);
+            //Complicated and requires bending over backwards to create an EventHandler of a certain kind
+        }
+
+        public Process CallPythonModule()
+        {
+            Model.Core.UI.WriteLine("Activating python...");
+            Process python_process = new Process();
+            python_process.StartInfo.FileName = "C:/Anaconda2/python.exe";
+            python_process.StartInfo.UseShellExecute = false;
+            python_process.StartInfo.CreateNoWindow = true;
+            python_process.StartInfo.Arguments = "external_module.py biomass_output.txt";
+            python_process.StartInfo.RedirectStandardOutput = true;
+
+            Model.Core.UI.WriteLine(python_process.StartInfo.FileName);
+            try
+            {
+                python_process.Start(); // start the process (the python program)
+            }
+            catch (Win32Exception w)
+            {
+                Model.Core.UI.WriteLine(w.Message);
+                Model.Core.UI.WriteLine(w.ErrorCode.ToString());
+                Model.Core.UI.WriteLine(w.NativeErrorCode.ToString());
+                Model.Core.UI.WriteLine(w.StackTrace);
+                Model.Core.UI.WriteLine(w.Source);
+                Exception e = w.GetBaseException();
+                Model.Core.UI.WriteLine(e.Message);
+            }
+
+            return python_process;        
+        }
+
+        //--------------------------------------------------------------------------
+
+        /*The main point is that this process must spin until we are sure that the
+             * Python module has finished running and completely written the raster file
+             * to memory. The programmar has proposed we do this using a lockfile, probably
+             * the simplest (platform-independent) version of a semaphore*/
+        public void ProcessMapAsync(ProcessLandUseAt processLandUseAt, string inputMapPath)
+        {
+            IInputRaster<MapPixel> inputMap;
+            Dictionary<string, int> counts = new Dictionary<string, int>();
+
             using (inputMap = Model.Core.OpenRaster<MapPixel>(inputMapPath))
             {
                 MapPixel pixel = inputMap.BufferPixel;

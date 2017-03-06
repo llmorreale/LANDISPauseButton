@@ -1,0 +1,25 @@
+LandisData  "Base Wind"
+
+Timestep  1
+
+>>             ___ Event Size ___   Rotation
+>> Ecoregion    Max   Mean    Min   Period
+>> ---------   ----   ----   ----   --------
+eco1        	1    1      1      2
+eco2 		1		1	1		1
+
+
+
+WindSeverities
+
+ >>            Cohort Age       Mortality
+ >> Severity   % of longevity   Probability
+ >> --------   --------------   -----------
+       5          0% to  20%       .1
+       4         20% to  50%       .1
+       3         50% to  70%       .1
+       2         70% to  85%       0.1
+       1         85% to 100%       0.1
+
+MapNames  wind/severity-{timestep}.gis
+LogFile   wind/log.csv

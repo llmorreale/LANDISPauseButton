@@ -1,0 +1,4 @@
+Time,InsectName,StartYear,StopYear,MeanDefoliation,NumSitesDefoliated0_33,NumSitesDefoliated33_66,NumSitesDefoliated66_100,NumOutbreakInitialSites,MortalityBiomass,
+0, GypsyMoth, 0, 0, 0, 0, 0, 0, 0, 0, 
+1, GypsyMoth, 0, 0, 0, 0, 0, 0, 0, 0, 
+2, GypsyMoth, 0, 0, 0, 0, 0, 0, 0, 0, 

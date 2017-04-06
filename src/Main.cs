@@ -17,6 +17,7 @@ using System.ComponentModel;
 using System.Collections.Generic;
 using System.IO;
 using System.Diagnostics;
+using Microsoft.Win32;
 
 namespace Landis.Extension.LandUse
 {
@@ -193,50 +194,57 @@ namespace Landis.Extension.LandUse
             lockfile.WriteByte(Convert.ToByte(Model.Core.CurrentTime));
             lockfile.Close();*/
 
-            //Call Python module here to signal creation of raster file
-            Process python_process = CallPythonModule();
-
-            //May be able to use this instead of lockfile if python terminates upon detecting raster on file system.
+            //Need to get string argument from some LANDIS inputfile so users can specify custom shell scripts.
+            Process python_process = CallShellScript("/K python external_module.py");
             python_process.WaitForExit();
-            Model.Core.UI.WriteLine(python_process.StandardOutput.ReadToEnd());
             python_process.Close(); //Not sure if terminates process of makes results inaccessible
             ProcessMapAsync(processLandUseAt, inputMapPath);
+        }
 
-            //----------------------------------------------------
+        //Using a command shell to evoke arbitrary processes specified by the user
+        public Process CallShellScript(string shell_command)
+        {
+            Model.Core.UI.WriteLine("Starting external shell...");
+            Process shell_process = new Process();
 
-            //One simple approach would be to loop until the file is deleted
-            /*Model.Core.UI.WriteLine("   Waiting for external output...");
-            int refreshRate = 100;
-            int refreshLimit = 10000;   //Let spin for ten seconds
-            int refreshCount = 0;
-            while (File.Exists(inputMapPath + "/lockfile") || refreshCount > refreshLimit)
+            shell_process.StartInfo.UseShellExecute = true;
+            shell_process.StartInfo.CreateNoWindow = true;
+            shell_process.StartInfo.FileName = "CMD.exe";
+            shell_process.StartInfo.Arguments = shell_command;
+            shell_process.StartInfo.RedirectStandardOutput = false;
+
+            try
             {
-                System.Threading.Thread.Sleep(refreshRate);
-                Model.Core.UI.WriteLine("Spinning");
-                refreshCount += refreshRate;
+                shell_process.Start(); // start the process 
+            }
+            catch (Win32Exception w)
+            {
+                Model.Core.UI.WriteLine(w.Message);
+                Model.Core.UI.WriteLine(w.ErrorCode.ToString());
+                Model.Core.UI.WriteLine(w.NativeErrorCode.ToString());
+                Model.Core.UI.WriteLine(w.StackTrace);
+                Model.Core.UI.WriteLine(w.Source);
+                Exception e = w.GetBaseException();
+                Model.Core.UI.WriteLine(e.Message);
             }
 
-            if (refreshCount > refreshLimit)
-            { Model.Core.UI.WriteLine("Failed to find input"); }
-            else
-            { ProcessMapAsync(processLandUseAt, inputMapPath); }*/
-
-            //Otherwise we can register events to this file system watcher to execute when something changes
-            //FileSystemWatcher file_watcher = new FileSystemWatcher(inputMapPath);
-            //file_watcher.EnableRaisingEvents = true;
-            //System.EventArgs args = new System.EventArgs(ProcessLandUseAt processAt, string inputMapPath);
-            //file_watcher.Deleted += new System.IO.FileSystemEventHandler(ProcessMapAsync);
-            //Complicated and requires bending over backwards to create an EventHandler of a certain kind
+            return shell_process;
         }
 
         public Process CallPythonModule()
         {
             Model.Core.UI.WriteLine("Activating python...");
             Process python_process = new Process();
-            python_process.StartInfo.FileName = "C:/Anaconda2/python.exe";
+            Model.Core.UI.WriteLine("Attempt to locate user Python installation...");
+            string python_path = "C:/Program Files/Python36/python.exe";
+            python_path = "C:/Python27/ArcGIS10.4/python.exe";
+
+            Model.Core.UI.WriteLine("Using Luca's Python 2.7 install: " + python_path);
+
+            python_process.StartInfo.FileName = python_path;
             python_process.StartInfo.UseShellExecute = false;
             python_process.StartInfo.CreateNoWindow = true;
-            python_process.StartInfo.Arguments = "external_module.py biomass_output.txt";
+            python_process.StartInfo.Arguments = "external_module.py";
             python_process.StartInfo.RedirectStandardOutput = true;
 
             Model.Core.UI.WriteLine(python_process.StartInfo.FileName);
@@ -310,4 +318,31 @@ namespace Landis.Extension.LandUse
                 SiteLog.Close();
         }
     }
+
+    //----------------------------------------------------
+
+    //One simple approach would be to loop until the file is deleted
+    /*Model.Core.UI.WriteLine("   Waiting for external output...");
+    int refreshRate = 100;
+    int refreshLimit = 10000;   //Let spin for ten seconds
+    int refreshCount = 0;
+    while (File.Exists(inputMapPath + "/lockfile") || refreshCount > refreshLimit)
+    {
+        System.Threading.Thread.Sleep(refreshRate);
+        Model.Core.UI.WriteLine("Spinning");
+        refreshCount += refreshRate;
+    }
+
+    if (refreshCount > refreshLimit)
+    { Model.Core.UI.WriteLine("Failed to find input"); }
+    else
+    { ProcessMapAsync(processLandUseAt, inputMapPath); }*/
+
+    //Otherwise we can register events to this file system watcher to execute when something changes
+    //FileSystemWatcher file_watcher = new FileSystemWatcher(inputMapPath);
+    //file_watcher.EnableRaisingEvents = true;
+    //System.EventArgs args = new System.EventArgs(ProcessLandUseAt processAt, string inputMapPath);
+    //file_watcher.Deleted += new System.IO.FileSystemEventHandler(ProcessMapAsync);
+    //Complicated and requires bending over backwards to create an EventHandler of a certain kind
+    // -------------------------------------------------
 }

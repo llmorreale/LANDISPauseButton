@@ -38,4 +38,5 @@ print(output_path)
 #thr = threading.Thread(target = check_file_async, args=(raster_path, 1), kwargs={})
 #thr.start()
 #thr.join()
+lockfile.close() #Close the lockfile stream before deletion
 os.remove("lockfile") #delete the lock file and terminate. 

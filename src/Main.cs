@@ -64,7 +64,11 @@ namespace Landis.Extension.LandUse
             Model.Core.UI.WriteLine("\t-Alfred Russel Wallace");
             Model.Core.UI.WriteLine("***********************************************************");
             Model.Core.UI.WriteLine("***********************************************************");
-            
+
+            Model.Core.UI.WriteLine("Pause routines: ");
+            Model.Core.UI.WriteLine("External script path: " + parameters.ExternalScript);
+            Model.Core.UI.WriteLine("External script executable: " + parameters.ExternalEngine);
+            Model.Core.UI.WriteLine("External command to execute: " + parameters.ExternalCommand);
             Model.Core.UI.WriteLine("Initializing {0}...", Name);
 
             SiteVars.Initialize(Model.Core);
@@ -195,14 +199,15 @@ namespace Landis.Extension.LandUse
             lockfile.Close();*/
 
             //Need to get string argument from some LANDIS inputfile so users can specify custom shell scripts.
-            Process python_process = CallShellScript("/K python external_module.py");
-            python_process.WaitForExit();
-            python_process.Close(); //Not sure if terminates process of makes results inaccessible
+            Process shell_process = CallShellScript();
+            //Process executable_process = CallExternalExecutable();
+            shell_process.WaitForExit();
+            shell_process.Close(); //Not sure if terminates process or makes results inaccessible
             ProcessMapAsync(processLandUseAt, inputMapPath);
         }
 
         //Using a command shell to evoke arbitrary processes specified by the user
-        public Process CallShellScript(string shell_command)
+        public Process CallShellScript()
         {
             Model.Core.UI.WriteLine("Starting external shell...");
             Process shell_process = new Process();
@@ -210,7 +215,7 @@ namespace Landis.Extension.LandUse
             shell_process.StartInfo.UseShellExecute = true;
             shell_process.StartInfo.CreateNoWindow = true;
             shell_process.StartInfo.FileName = "CMD.exe";
-            shell_process.StartInfo.Arguments = shell_command;
+            shell_process.StartInfo.Arguments = "/K " + parameters.ExternalCommand;
             shell_process.StartInfo.RedirectStandardOutput = false;
 
             try
@@ -231,20 +236,14 @@ namespace Landis.Extension.LandUse
             return shell_process;
         }
 
-        public Process CallPythonModule()
+        public Process CallExternalExecutable()
         {
-            Model.Core.UI.WriteLine("Activating python...");
             Process python_process = new Process();
-            Model.Core.UI.WriteLine("Attempt to locate user Python installation...");
-            string python_path = "C:/Program Files/Python36/python.exe";
-            python_path = "C:/Python27/ArcGIS10.4/python.exe";
 
-            Model.Core.UI.WriteLine("Using Luca's Python 2.7 install: " + python_path);
-
-            python_process.StartInfo.FileName = python_path;
+            python_process.StartInfo.FileName = parameters.ExternalEngine;
             python_process.StartInfo.UseShellExecute = false;
             python_process.StartInfo.CreateNoWindow = true;
-            python_process.StartInfo.Arguments = "external_module.py";
+            python_process.StartInfo.Arguments = parameters.ExternalScript;
             python_process.StartInfo.RedirectStandardOutput = true;
 
             Model.Core.UI.WriteLine(python_process.StartInfo.FileName);

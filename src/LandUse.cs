@@ -15,6 +15,7 @@ namespace Landis.Extension.LandUse
         public string Name { get; protected set; }
         public ushort MapCode { get; protected set; }
         public bool AllowHarvest { get; protected set; }
+        //public bool AllowHarvest { get; set; }
         public bool AllowEstablishment { get; protected set; }
         public LandCover.IChange LandCoverChange { get; protected set; }
 

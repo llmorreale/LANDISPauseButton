@@ -8,3 +8,13 @@ Next on the list is to allow users to specify a script file and scripting langua
 execution in the landuse.txt file associated with the LU+ module. Users can specify:
 -A name of a script and an executable to a scripting engine e.g. python.exe, R.exe, etc
 -A command for automatic entry into the Windows Command prompt (CMD.exe) for alternate execution
+
+4/10 - 4/17: Notes, comments and planned code were added for Harvest allowance. I investigated the new module needing changes, the AllowHarvest
+parameter on LandUse types. Harvest allowance is specified per LandUse types, controlling each raster cell of that type. In the 
+wobegon example, four LandUse types exist: Garden, forest, urban, and no-harvest easement. Tentatively I believe changing two 
+lines of code will allow users to change the harvest allowance for land-use types at any time-step. Harvest allowance is exposed
+as a read-only property at line 52 of AllowHarvestSiteVars.cs (containing only a "get" method). By creating a "set" method at line 56
+we can specify different LandUse types by index (0: forest, 1: urban, 2: Garden, 3: easement) and set the harvest allowance parameter
+directly. It will be up to the calling function to know which landuse type corresponds to which parameter. The "set" method of the 
+AllowHarvest property in LandUse.cs must also be made public for users to be able to set the value of the parameter externally. This
+change is made in line line 18 of LandUse.cs. No changes to other extensions or the core model are projected to be necessary.

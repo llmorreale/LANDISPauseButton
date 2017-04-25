@@ -18,3 +18,7 @@ we can specify different LandUse types by index (0: forest, 1: urban, 2: Garden,
 directly. It will be up to the calling function to know which landuse type corresponds to which parameter. The "set" method of the 
 AllowHarvest property in LandUse.cs must also be made public for users to be able to set the value of the parameter externally. This
 change is made in line line 18 of LandUse.cs. No changes to other extensions or the core model are projected to be necessary.
+
+4/18 - 4/24: Updated Land-Use documentation, see .pdf for changes to example file, details on new parameters, and explanation of Pause
+functionality. Command-line pause functionality automatically closes external shell--no longer need to wait for user to close shell to
+continue model execution.

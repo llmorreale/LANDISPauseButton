@@ -94,8 +94,9 @@ namespace Landis.Extension.LandUse
             if (SiteLog.Enabled)
                 SiteLog.TimestepSetUp();
 
-            //ProcessInputMap(
-            ProcessInputMapAsync(
+            PauseTimestep();
+            
+            ProcessInputMap(
                 delegate(Site site,
                          LandUse newLandUse)
                 {
@@ -135,7 +136,8 @@ namespace Landis.Extension.LandUse
         public delegate string ProcessLandUseAt(Site site, LandUse landUse);
 
         //---------------------------------------------------------------------
-
+        
+        //Modified to add inputMapPath, allowing users to specify raster paths to change at timestep
         public void ProcessInputMap(ProcessLandUseAt processLandUseAt)
         {
             string inputMapPath = MapNames.ReplaceTemplateVars(inputMapTemplate, Model.Core.CurrentTime);
@@ -182,12 +184,9 @@ namespace Landis.Extension.LandUse
         /*The Python module can write to the location this method refers to,
             which appears to be indexed by the model's current time step, or 
              we can provide a consistent path to the Python module's output */
-        public void ProcessInputMapAsync(ProcessLandUseAt processLandUseAt)
+        public void PauseTimestep()
         {          
-            string inputMapPath = MapNames.ReplaceTemplateVars(inputMapTemplate, Model.Core.CurrentTime);
-            
             Model.Core.UI.WriteLine("Current time: ", Model.Core.CurrentTime);
-            Model.Core.UI.WriteLine("  Reading map \"{0}\"...", inputMapPath);
             
             //Create an empty lockfile at the appropriate path - may need a separate path for lockfile and rasterfile
             StreamWriter lock_file = new StreamWriter(System.IO.Directory.GetCurrentDirectory() + "/lockfile");
@@ -198,12 +197,23 @@ namespace Landis.Extension.LandUse
             lockfile.WriteByte(Convert.ToByte(Model.Core.CurrentTime));
             lockfile.Close();*/
 
-            //Need to get string argument from some LANDIS inputfile so users can specify custom shell scripts.
-            Process shell_process = CallShellScript();
-            //Process executable_process = CallExternalExecutable();
-            shell_process.WaitForExit();
-            shell_process.Close(); //Not sure if terminates process or makes results inaccessible
-            ProcessMapAsync(processLandUseAt, inputMapPath);
+            Process pause_process;
+            if (parameters.ExternalCommand != "") //Exhibits preference for custom commands
+            {
+                pause_process = CallShellScript();
+                pause_process.WaitForExit();
+                pause_process.Close();
+            }
+            else if (parameters.ExternalEngine != "" && parameters.ExternalScript != "")
+            {
+                pause_process = CallExternalExecutable();
+                pause_process.WaitForExit();
+                pause_process.Close();
+            }
+            else
+            {
+                Model.Core.UI.WriteLine("No pause processes specified, continuing normally");
+            }
         }
 
         //Using a command shell to evoke arbitrary processes specified by the user
@@ -215,7 +225,7 @@ namespace Landis.Extension.LandUse
             shell_process.StartInfo.UseShellExecute = true;
             shell_process.StartInfo.CreateNoWindow = true;
             shell_process.StartInfo.FileName = "CMD.exe";
-            shell_process.StartInfo.Arguments = "/K " + parameters.ExternalCommand;
+            shell_process.StartInfo.Arguments = "/C " + parameters.ExternalCommand;
             shell_process.StartInfo.RedirectStandardOutput = false;
 
             try
@@ -263,50 +273,6 @@ namespace Landis.Extension.LandUse
             }
 
             return python_process;        
-        }
-
-        //--------------------------------------------------------------------------
-
-        /*The main point is that this process must spin until we are sure that the
-             * Python module has finished running and completely written the raster file
-             * to memory. The programmar has proposed we do this using a lockfile, probably
-             * the simplest (platform-independent) version of a semaphore*/
-        public void ProcessMapAsync(ProcessLandUseAt processLandUseAt, string inputMapPath)
-        {
-            IInputRaster<MapPixel> inputMap;
-            Dictionary<string, int> counts = new Dictionary<string, int>();
-
-            using (inputMap = Model.Core.OpenRaster<MapPixel>(inputMapPath))
-            {
-                MapPixel pixel = inputMap.BufferPixel;
-                foreach (Site site in Model.Core.Landscape.AllSites)
-                {
-                    inputMap.ReadBufferPixel();
-                    if (site.IsActive)
-                    {
-                        LandUse landUse = LandUseRegistry.LookUp(pixel.LandUseCode.Value);
-                        if (landUse == null)
-                        {
-                            string message = string.Format("Error: Unknown map code ({0}) at pixel {1}",
-                                                           pixel.LandUseCode.Value,
-                                                           site.Location);
-                            throw new System.ApplicationException(message);
-                        }
-                        string key = processLandUseAt(site, landUse);
-                        if (key != null)
-                        {
-                            int count;
-                            if (counts.TryGetValue(key, out count))
-                                count = count + 1;
-                            else
-                                count = 1;
-                            counts[key] = count;
-                        }
-                    }
-                }
-            }
-            foreach (string key in counts.Keys)
-                Model.Core.UI.WriteLine("    {0} ({1:#,##0})", key, counts[key]);
         }
 
         //---------------------------------------------------------------------

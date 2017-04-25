@@ -17,6 +17,7 @@ namespace Landis.Extension.LandUse
         public bool AllowHarvest { get; protected set; }
         //public bool AllowHarvest { get; set; }
         public bool AllowEstablishment { get; protected set; }
+        //public bool AllowEstablishment { get; set; }
         public LandCover.IChange LandCoverChange { get; protected set; }
 
         //---------------------------------------------------------------------

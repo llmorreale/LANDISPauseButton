@@ -11,13 +11,7 @@ using Landis.Core;
 using Landis.Library.Succession;
 using Landis.SpatialModeling;
 using log4net;
-
-using System;
-using System.ComponentModel;
 using System.Collections.Generic;
-using System.IO;
-using System.Diagnostics;
-using Microsoft.Win32;
 
 namespace Landis.Extension.LandUse
 {
@@ -31,6 +25,7 @@ namespace Landis.Extension.LandUse
         public static readonly string ExtensionName = "Land Use";
 
         private Parameters parameters;
+        private Pause pauseFunction;
         private string inputMapTemplate;
 
         //---------------------------------------------------------------------
@@ -56,24 +51,14 @@ namespace Landis.Extension.LandUse
 
         public override void Initialize()
         {
-            Model.Core.UI.WriteLine("***********************************************************");
-            Model.Core.UI.WriteLine("***********************************************************");
-            Model.Core.UI.WriteLine("This is the Thompson lab's custom Land-Use module");
-            Model.Core.UI.WriteLine("-----------------------------------------------------------");
-            Model.Core.UI.WriteLine("Modification of form is admitted to be a matter of time.");
-            Model.Core.UI.WriteLine("\t-Alfred Russel Wallace");
-            Model.Core.UI.WriteLine("***********************************************************");
-            Model.Core.UI.WriteLine("***********************************************************");
-
-            Model.Core.UI.WriteLine("Pause routines: ");
-            Model.Core.UI.WriteLine("External script path: " + parameters.ExternalScript);
-            Model.Core.UI.WriteLine("External script executable: " + parameters.ExternalEngine);
-            Model.Core.UI.WriteLine("External command to execute: " + parameters.ExternalCommand);
             Model.Core.UI.WriteLine("Initializing {0}...", Name);
 
             SiteVars.Initialize(Model.Core);
             Timestep = parameters.Timestep;
             inputMapTemplate = parameters.InputMaps;
+
+            pauseFunction = new Pause(parameters.ExternalScript, parameters.ExternalEngine, parameters.ExternalCommand);
+
             if (parameters.SiteLogPath != null)
                 SiteLog.Initialize(parameters.SiteLogPath);
 
@@ -94,7 +79,7 @@ namespace Landis.Extension.LandUse
             if (SiteLog.Enabled)
                 SiteLog.TimestepSetUp();
 
-            PauseTimestep();
+            pauseFunction.PauseTimestep();
             
             ProcessInputMap(
                 delegate(Site site,
@@ -177,103 +162,7 @@ namespace Landis.Extension.LandUse
             }
             foreach (string key in counts.Keys)
                 Model.Core.UI.WriteLine("    {0} ({1:#,##0})", key, counts[key]);
-        }
-
-        //------------------------------------------------------------------------
-
-        /*The Python module can write to the location this method refers to,
-            which appears to be indexed by the model's current time step, or 
-             we can provide a consistent path to the Python module's output */
-        public void PauseTimestep()
-        {          
-            Model.Core.UI.WriteLine("Current time: ", Model.Core.CurrentTime);
-            
-            //Create an empty lockfile at the appropriate path - may need a separate path for lockfile and rasterfile
-            StreamWriter lock_file = new StreamWriter(System.IO.Directory.GetCurrentDirectory() + "/lockfile");
-            lock_file.WriteLine(Model.Core.CurrentTime.ToString());
-            lock_file.Close();
-
-            /*FileStream lockfile = new FileStream(System.IO.Directory.GetCurrentDirectory() + "/lockfile", FileMode.Create);
-            lockfile.WriteByte(Convert.ToByte(Model.Core.CurrentTime));
-            lockfile.Close();*/
-
-            Process pause_process;
-            if (parameters.ExternalCommand != "") //Exhibits preference for custom commands
-            {
-                pause_process = CallShellScript();
-                pause_process.WaitForExit();
-                pause_process.Close();
-            }
-            else if (parameters.ExternalEngine != "" && parameters.ExternalScript != "")
-            {
-                pause_process = CallExternalExecutable();
-                pause_process.WaitForExit();
-                pause_process.Close();
-            }
-            else
-            {
-                Model.Core.UI.WriteLine("No pause processes specified, continuing normally");
-            }
-        }
-
-        //Using a command shell to evoke arbitrary processes specified by the user
-        public Process CallShellScript()
-        {
-            Model.Core.UI.WriteLine("Starting external shell...");
-            Process shell_process = new Process();
-
-            shell_process.StartInfo.UseShellExecute = true;
-            shell_process.StartInfo.CreateNoWindow = true;
-            shell_process.StartInfo.FileName = "CMD.exe";
-            shell_process.StartInfo.Arguments = "/C " + parameters.ExternalCommand;
-            shell_process.StartInfo.RedirectStandardOutput = false;
-
-            try
-            {
-                shell_process.Start(); // start the process 
-            }
-            catch (Win32Exception w)
-            {
-                Model.Core.UI.WriteLine(w.Message);
-                Model.Core.UI.WriteLine(w.ErrorCode.ToString());
-                Model.Core.UI.WriteLine(w.NativeErrorCode.ToString());
-                Model.Core.UI.WriteLine(w.StackTrace);
-                Model.Core.UI.WriteLine(w.Source);
-                Exception e = w.GetBaseException();
-                Model.Core.UI.WriteLine(e.Message);
-            }
-
-            return shell_process;
-        }
-
-        public Process CallExternalExecutable()
-        {
-            Process python_process = new Process();
-
-            python_process.StartInfo.FileName = parameters.ExternalEngine;
-            python_process.StartInfo.UseShellExecute = false;
-            python_process.StartInfo.CreateNoWindow = true;
-            python_process.StartInfo.Arguments = parameters.ExternalScript;
-            python_process.StartInfo.RedirectStandardOutput = true;
-
-            Model.Core.UI.WriteLine(python_process.StartInfo.FileName);
-            try
-            {
-                python_process.Start(); // start the process (the python program)
-            }
-            catch (Win32Exception w)
-            {
-                Model.Core.UI.WriteLine(w.Message);
-                Model.Core.UI.WriteLine(w.ErrorCode.ToString());
-                Model.Core.UI.WriteLine(w.NativeErrorCode.ToString());
-                Model.Core.UI.WriteLine(w.StackTrace);
-                Model.Core.UI.WriteLine(w.Source);
-                Exception e = w.GetBaseException();
-                Model.Core.UI.WriteLine(e.Message);
-            }
-
-            return python_process;        
-        }
+        }    
 
         //---------------------------------------------------------------------
 
@@ -285,29 +174,4 @@ namespace Landis.Extension.LandUse
     }
 
     //----------------------------------------------------
-
-    //One simple approach would be to loop until the file is deleted
-    /*Model.Core.UI.WriteLine("   Waiting for external output...");
-    int refreshRate = 100;
-    int refreshLimit = 10000;   //Let spin for ten seconds
-    int refreshCount = 0;
-    while (File.Exists(inputMapPath + "/lockfile") || refreshCount > refreshLimit)
-    {
-        System.Threading.Thread.Sleep(refreshRate);
-        Model.Core.UI.WriteLine("Spinning");
-        refreshCount += refreshRate;
-    }
-
-    if (refreshCount > refreshLimit)
-    { Model.Core.UI.WriteLine("Failed to find input"); }
-    else
-    { ProcessMapAsync(processLandUseAt, inputMapPath); }*/
-
-    //Otherwise we can register events to this file system watcher to execute when something changes
-    //FileSystemWatcher file_watcher = new FileSystemWatcher(inputMapPath);
-    //file_watcher.EnableRaisingEvents = true;
-    //System.EventArgs args = new System.EventArgs(ProcessLandUseAt processAt, string inputMapPath);
-    //file_watcher.Deleted += new System.IO.FileSystemEventHandler(ProcessMapAsync);
-    //Complicated and requires bending over backwards to create an EventHandler of a certain kind
-    // -------------------------------------------------
 }

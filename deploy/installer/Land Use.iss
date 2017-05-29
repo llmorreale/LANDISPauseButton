@@ -17,14 +17,14 @@
 
 [Setup]
 #include LandisSDK + '\packaging\Setup-directives.iss'
-LicenseFile=..\LICENSE.txt
+LicenseFile=..\..\LICENSE.txt
 
 [Files]
 ; The extension's assembly
 Source: {#LandisBuildDir}\{#ExtensionAssembly}.dll; DestDir: {app}\bin\extensions
 
 ; Harvest libraries
-#define ConfigOutDir "..\src\bin\Release"
+#define ConfigOutDir "..\..\src\bin\Release"
 Source: {#ConfigOutDir}\Landis.Library.BiomassHarvest-v1.dll; DestDir: {app}\bin\extensions
 Source: {#ConfigOutDir}\Landis.Library.SiteHarvest-v1.dll; DestDir: {app}\bin\extensions
 

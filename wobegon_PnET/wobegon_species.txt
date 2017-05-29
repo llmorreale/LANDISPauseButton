@@ -1,9 +1,0 @@
-LandisData	Species									
-										
->>		Sexual	Shade	Fire	Seed Dispersal	Dist.	Vegetative	Sprout Age	>>Sproat Age	Post-Fire
->> Name	LongevityMaturity	Tol.	Tol.	Effective	Maximum	Reprod Prob	Min	Max	
->> ----	---------	--------	-----	----	---------	-------	-----------	----------	--------	
-PIST	400	25	3	3	60	210	0	0	0	none
-TSCA	500	20	5	2	30	100	0	0	0	none
-FAGR	350	10	5	1	30	300	0.4	10	200	resprout
-
